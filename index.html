@@ -3,25 +3,30 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Routine MVP</title>
+  <title>Routine Builder</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
 
   <div class="bg-white w-full max-w-md p-6 rounded-2xl shadow">
-    <h1 class="text-xl font-bold mb-4">Daily Routine</h1>
+    
+    <h1 class="text-xl font-bold mb-1">🧠 Routine Builder</h1>
+    <p class="text-sm text-gray-500 mb-4">Experiment. Adjust. Stay consistent.</p>
 
-    <!-- Method -->
-    <select id="method" class="w-full mb-4 p-2 border rounded">
-      <option>Habit Stacking</option>
-      <option>Time Blocking</option>
-      <option selected>Checklist</option>
-    </select>
+    <!-- Tabs -->
+    <div class="flex gap-2 mb-4">
+      <button onclick="switchTab('Checklist')" id="tab-Checklist" class="tab px-3 py-1 rounded bg-black text-white">✅ Checklist</button>
+      <button onclick="switchTab('Habit Stacking')" id="tab-Habit Stacking" class="tab px-3 py-1 rounded bg-gray-200">🔗 Stacking</button>
+      <button onclick="switchTab('Time Blocking')" id="tab-Time Blocking" class="tab px-3 py-1 rounded bg-gray-200">⏰ Blocking</button>
+    </div>
+
+    <!-- Method Info -->
+    <div id="methodInfo" class="text-xs text-gray-500 mb-3"></div>
 
     <!-- Add Task -->
     <div class="flex gap-2 mb-4">
-      <input id="taskInput" class="flex-1 p-2 border rounded" placeholder="Add task..." />
-      <button onclick="addTask()" class="bg-black text-white px-3 rounded">+</button>
+      <input id="taskInput" class="flex-1 p-2 border rounded" placeholder="Add step..." />
+      <button onclick="addTask()" class="bg-black text-white px-3 rounded">➕</button>
     </div>
 
     <!-- Tasks -->
@@ -33,103 +38,12 @@
       <div id="progressBar" class="bg-black h-2 rounded" style="width:0%"></div>
     </div>
 
+    <!-- Empty State -->
     <p id="emptyState" class="text-sm text-gray-400 mt-4 hidden">
-      Start small. Add 1 task.
+      🌱 Start small — add your first step.
     </p>
+
   </div>
 
 <script>
-let tasks = [];
-let method = "Checklist";
-let lastDate = null;
-
-function load() {
-  const data = JSON.parse(localStorage.getItem("routine-app"));
-  if (data) {
-    tasks = data.tasks || [];
-    method = data.method || "Checklist";
-    lastDate = data.lastDate;
-    document.getElementById("method").value = method;
-  }
-}
-
-function save() {
-  localStorage.setItem("routine-app", JSON.stringify({
-    tasks, method, lastDate
-  }));
-}
-
-function resetIfNewDay() {
-  const today = new Date().toDateString();
-  if (lastDate && lastDate !== today) {
-    tasks = tasks.map(t => ({ ...t, completed: false }));
-  }
-  lastDate = today;
-}
-
-function addTask() {
-  const input = document.getElementById("taskInput");
-  if (!input.value.trim()) return;
-
-  tasks.push({ text: input.value, completed: false });
-  input.value = "";
-  render();
-}
-
-function toggleTask(i) {
-  tasks[i].completed = !tasks[i].completed;
-  render();
-}
-
-function deleteTask(i) {
-  tasks.splice(i, 1);
-  render();
-}
-
-function render() {
-  const list = document.getElementById("taskList");
-  list.innerHTML = "";
-
-  tasks.forEach((task, i) => {
-    const div = document.createElement("div");
-    div.className = "flex justify-between items-center border p-2 rounded";
-
-    const span = document.createElement("span");
-    span.textContent = task.text;
-    span.className = "flex-1 cursor-pointer " + (task.completed ? "line-through text-gray-400" : "");
-    span.onclick = () => toggleTask(i);
-
-    const del = document.createElement("button");
-    del.textContent = "x";
-    del.className = "text-red-500 ml-2";
-    del.onclick = () => deleteTask(i);
-
-    div.appendChild(span);
-    div.appendChild(del);
-    list.appendChild(div);
-  });
-
-  const completed = tasks.filter(t => t.completed).length;
-  const total = tasks.length;
-  const percent = total ? Math.round((completed / total) * 100) : 0;
-
-  document.getElementById("progressText").innerText =
-    `${completed}/${total} completed`;
-
-  document.getElementById("progressBar").style.width = percent + "%";
-
-  document.getElementById("emptyState").style.display =
-    total === 0 ? "block" : "none";
-
-  method = document.getElementById("method").value;
-
-  save();
-}
-
-load();
-resetIfNewDay();
-render();
-</script>
-
-</body>
-</html>
+let ta
