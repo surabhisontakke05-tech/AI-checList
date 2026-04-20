@@ -1,176 +1,257 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>How many layers</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>How many layers</title>
 
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #ffffff;
-      color: #111;
-      text-align: center;
-      padding: 50px 20px;
-    }
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    background: #fff;
+    color: #111;
+    padding: 40px 20px;
+  }
 
-    h1 {
-      font-size: 2rem;
-      margin-bottom: 30px;
-    }
+  h1 {
+    text-align: center;
+    margin-bottom: 30px;
+  }
 
-    input {
-      padding: 14px;
-      font-size: 16px;
-      width: 280px;
-      border-radius: 10px;
-      border: 1px solid #ccc;
-    }
+  input {
+    display: block;
+    margin: 0 auto;
+    padding: 14px;
+    width: 280px;
+    border-radius: 10px;
+    border: 1px solid #ccc;
+  }
 
-    .suggestions {
-      max-width: 280px;
-      margin: 10px auto;
-      border: 1px solid #eee;
-      border-radius: 10px;
-      overflow: hidden;
-    }
+  .suggestions {
+    max-width: 280px;
+    margin: 10px auto;
+    border: 1px solid #eee;
+    border-radius: 10px;
+    overflow: hidden;
+  }
 
-    .suggestions div {
-      padding: 10px;
-      cursor: pointer;
-      background: #fff;
-    }
+  .suggestions div {
+    padding: 10px;
+    cursor: pointer;
+  }
 
-    .suggestions div:hover {
-      background: #f5f5f5;
-    }
+  .suggestions div:hover {
+    background: #f5f5f5;
+  }
 
-    .results {
-      margin-top: 40px;
-    }
+  .main {
+    max-width: 420px;
+    margin: 40px auto;
+  }
 
-    .card {
-      border: 1px solid #eee;
-      border-radius: 14px;
-      padding: 20px;
-      margin: 10px auto;
-      max-width: 280px;
-    }
+  .big-number {
+    font-size: 64px;
+    font-weight: bold;
+  }
 
-    .time {
-      font-weight: bold;
-      margin-bottom: 8px;
-    }
-  </style>
+  .emoji-row {
+    font-size: 28px;
+    margin: 10px 0;
+  }
+
+  .desc {
+    font-size: 18px;
+    margin-bottom: 20px;
+  }
+
+  .weather {
+    font-size: 14px;
+    color: #444;
+    margin-bottom: 30px;
+  }
+
+  .small-cards {
+    display: flex;
+    gap: 10px;
+  }
+
+  .small-card {
+    flex: 1;
+    border: 1px solid #eee;
+    border-radius: 10px;
+    padding: 12px;
+    text-align: center;
+  }
+
+  .small-card .time {
+    font-size: 12px;
+    color: #666;
+  }
+
+  .loading {
+    text-align: center;
+    margin-top: 40px;
+    color: #666;
+  }
+</style>
 </head>
 
 <body>
 
-  <h1>How many layers today?</h1>
+<h1>How many layers today?</h1>
 
-  <input id="input" placeholder="Enter your city..." autocomplete="off"/>
-  <div id="suggestions" class="suggestions"></div>
+<input id="input" placeholder="Detecting your location..." autocomplete="off"/>
+<div id="suggestions" class="suggestions"></div>
 
-  <div id="results" class="results"></div>
+<div id="results"></div>
 
-  <script>
-    const input = document.getElementById("input");
-    const suggestionsBox = document.getElementById("suggestions");
-    const resultsDiv = document.getElementById("results");
+<script>
+const input = document.getElementById("input");
+const suggestionsBox = document.getElementById("suggestions");
+const resultsDiv = document.getElementById("results");
 
-    let selectedLocation = null;
+let selectedLocation = null;
+let locationName = "";
 
-    // 🔍 Fetch location suggestions (NO API KEY)
-    input.addEventListener("input", async () => {
-      const value = input.value;
+// 🔍 Autocomplete
+input.addEventListener("input", async () => {
+  const value = input.value;
 
-      if (value.length < 2) {
-        suggestionsBox.innerHTML = "";
-        return;
-      }
+  if (value.length < 2) {
+    suggestionsBox.innerHTML = "";
+    return;
+  }
 
-      try {
-        const res = await fetch(
-          `https://geocoding-api.open-meteo.com/v1/search?name=${value}`
-        );
+  const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${value}`);
+  const data = await res.json();
 
-        const data = await res.json();
+  if (!data.results) return;
 
-        if (!data.results) {
-          suggestionsBox.innerHTML = "";
-          return;
-        }
+  suggestionsBox.innerHTML = data.results.slice(0,5).map(loc => `
+    <div onclick="selectLocation('${loc.name}', '${loc.admin1 || ""}', ${loc.latitude}, ${loc.longitude})">
+      ${loc.name}, ${loc.country}
+    </div>
+  `).join("");
+});
 
-        suggestionsBox.innerHTML = data.results
-          .slice(0, 5)
-          .map(
-            (loc) => `
-            <div onclick="selectLocation('${loc.name}', ${loc.latitude}, ${loc.longitude})">
-              ${loc.name}, ${loc.country}
-            </div>
-          `
-          )
-          .join("");
-      } catch (e) {
-        console.error(e);
-      }
-    });
+// 📍 Select location manually
+function selectLocation(name, region, lat, lon) {
+  input.value = name;
+  suggestionsBox.innerHTML = "";
+  selectedLocation = { lat, lon };
+  locationName = region ? `${name}, ${region}` : name;
+  fetchWeather();
+}
 
-    // 📍 Select location
-    function selectLocation(name, lat, lon) {
-      input.value = name;
-      suggestionsBox.innerHTML = "";
+// 🌍 Auto-detect user location
+async function detectLocation() {
+  resultsDiv.innerHTML = `<div class="loading">Detecting location...</div>`;
 
-      selectedLocation = { lat, lon };
-      fetchWeather();
+  if (!navigator.geolocation) {
+    resultsDiv.innerHTML = `<div class="loading">Location not supported</div>`;
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(async (pos) => {
+    const lat = pos.coords.latitude;
+    const lon = pos.coords.longitude;
+
+    selectedLocation = { lat, lon };
+
+    // Reverse geocode
+    const res = await fetch(
+      `https://geocoding-api.open-meteo.com/v1/reverse?latitude=${lat}&longitude=${lon}`
+    );
+
+    const data = await res.json();
+
+    if (data.results && data.results.length > 0) {
+      const place = data.results[0];
+      locationName = place.admin1
+        ? `${place.name}, ${place.admin1}`
+        : place.name;
+
+      input.value = place.name;
+    } else {
+      locationName = "Your location";
+      input.value = "Your location";
     }
 
-    // 🌤 Fetch weather (NO API KEY)
-    async function fetchWeather() {
-      try {
-        const res = await fetch(
-          `https://api.open-meteo.com/v1/forecast?latitude=${selectedLocation.lat}&longitude=${selectedLocation.lon}&hourly=temperature_2m&forecast_days=1`
-        );
+    fetchWeather();
+  }, () => {
+    resultsDiv.innerHTML = `<div class="loading">Location access denied</div>`;
+  });
+}
 
-        const data = await res.json();
+// 🌤 Weather
+async function fetchWeather() {
+  resultsDiv.innerHTML = `<div class="loading">Loading weather...</div>`;
 
-        const nowIndex = 0;
-        const plus3 = 3;
-        const plus6 = 6;
+  const res = await fetch(
+    `https://api.open-meteo.com/v1/forecast?latitude=${selectedLocation.lat}&longitude=${selectedLocation.lon}&hourly=temperature_2m&daily=temperature_2m_max,temperature_2m_min&forecast_days=1`
+  );
 
-        const temps = [
-          data.hourly.temperature_2m[nowIndex],
-          data.hourly.temperature_2m[plus3],
-          data.hourly.temperature_2m[plus6],
-        ];
+  const data = await res.json();
 
-        const labels = ["Now", "+3h", "+6h"];
+  const temps = data.hourly.temperature_2m;
 
-        resultsDiv.innerHTML = temps
-          .map((temp, i) => {
-            return `
-              <div class="card">
-                <div class="time">${labels[i]}</div>
-                <div>${temp.toFixed(1)}°C</div>
-                <div>${getLayers(temp)}</div>
-              </div>
-            `;
-          })
-          .join("");
-      } catch (e) {
-        console.error(e);
-      }
-    }
+  const now = temps[0];
+  const plus6 = temps[6];
+  const plus12 = temps[12];
 
-    // 🧥 Layer logic
-    function getLayers(temp) {
-      if (temp >= 25) return "1 layer (t-shirt)";
-      if (temp >= 18) return "2 layers (light layer)";
-      if (temp >= 10) return "3 layers (jacket)";
-      if (temp >= 0) return "4 layers (coat)";
-      return "5 layers (winter gear)";
-    }
-  </script>
+  const high = data.daily.temperature_2m_max[0];
+  const low = data.daily.temperature_2m_min[0];
+
+  const mainLayer = getLayerData(now);
+
+  resultsDiv.innerHTML = `
+    <div class="main">
+      
+      <div class="big-number">${mainLayer.count}</div>
+      <div class="emoji-row">${mainLayer.emojis}</div>
+      <div class="desc">${mainLayer.label}</div>
+
+      <div class="weather">
+        Weather in ${locationName}<br/>
+        ${now.toFixed(1)}°C<br/><br/>
+        High: ${high.toFixed(1)}°C<br/>
+        Low: ${low.toFixed(1)}°C
+      </div>
+
+      <div class="small-cards">
+        ${smallCard("+6h", plus6)}
+        ${smallCard("+12h", plus12)}
+      </div>
+
+    </div>
+  `;
+}
+
+// 🧥 Layer logic
+function getLayerData(temp) {
+  if (temp >= 25) return { count: 1, emojis: "👕", label: "T-shirt weather" };
+  if (temp >= 18) return { count: 2, emojis: "👕 🧥", label: "Light jacket weather" };
+  if (temp >= 10) return { count: 3, emojis: "👕 🧥 🧥", label: "Jacket weather" };
+  if (temp >= 0) return { count: 4, emojis: "👕 🧥 🧥 🧥", label: "Coat weather" };
+  return { count: 5, emojis: "👕 🧥 🧥 🧥 🧥", label: "Bundle up 🥶" };
+}
+
+// small cards
+function smallCard(time, temp) {
+  const layer = getLayerData(temp);
+
+  return `
+    <div class="small-card">
+      <div class="time">${time}</div>
+      <div>${temp.toFixed(1)}°C</div>
+      <div>${layer.emojis}</div>
+    </div>
+  `;
+}
+
+// 🚀 Init
+detectLocation();
+</script>
 
 </body>
 </html>
