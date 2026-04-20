@@ -1,171 +1,136 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Routine Builder</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <meta charset="UTF-8">
+  <title>How Many Layers</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #ffffff;
+      color: #111;
+      text-align: center;
+      padding: 40px;
+    }
+    h1 {
+      font-size: 2rem;
+      margin-bottom: 20px;
+    }
+    input {
+      padding: 12px;
+      font-size: 16px;
+      width: 280px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+    }
+    .suggestions {
+      border: 1px solid #ddd;
+      max-width: 280px;
+      margin: 0 auto;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .suggestions div {
+      padding: 10px;
+      cursor: pointer;
+      background: #fff;
+    }
+    .suggestions div:hover {
+      background: #f0f0f0;
+    }
+    .results {
+      margin-top: 40px;
+    }
+    .card {
+      border: 1px solid #ddd;
+      border-radius: 12px;
+      padding: 20px;
+      margin: 10px auto;
+      max-width: 300px;
+    }
+    .time {
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+  </style>
 </head>
-<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
+<body>
 
-  <div class="bg-white w-full max-w-md p-6 rounded-2xl shadow">
-    
-    <h1 class="text-xl font-bold mb-1">🧠 Routine Builder</h1>
-    <p class="text-sm text-gray-500 mb-4">Experiment. Adjust. Stay consistent.</p>
+<h1>How many layers today?</h1>
 
-    <!-- Tabs -->
-    <div class="flex gap-2 mb-4">
-      <button onclick="switchTab('Checklist')" id="tab-Checklist" class="tab px-3 py-1 rounded bg-black text-white">✅ Checklist</button>
-      <button onclick="switchTab('Habit Stacking')" id="tab-Habit Stacking" class="tab px-3 py-1 rounded bg-gray-200">🔗 Stacking</button>
-      <button onclick="switchTab('Time Blocking')" id="tab-Time Blocking" class="tab px-3 py-1 rounded bg-gray-200">⏰ Blocking</button>
-    </div>
+<input id="locationInput" placeholder="Enter your city..." autocomplete="off">
+<div id="suggestions" class="suggestions"></div>
 
-    <!-- Method Info -->
-    <div id="methodInfo" class="text-xs text-gray-500 mb-3"></div>
-
-    <!-- Add Task -->
-    <div class="flex gap-2 mb-4">
-      <input id="taskInput" class="flex-1 p-2 border rounded" placeholder="Add step..." />
-      <button onclick="addTask()" class="bg-black text-white px-3 rounded">➕</button>
-    </div>
-
-    <!-- Tasks -->
-    <div id="taskList" class="space-y-2 mb-4"></div>
-
-    <!-- Progress -->
-    <div class="text-sm mb-2" id="progressText"></div>
-    <div class="w-full bg-gray-200 h-2 rounded">
-      <div id="progressBar" class="bg-black h-2 rounded" style="width:0%"></div>
-    </div>
-
-    <!-- Empty State -->
-    <p id="emptyState" class="text-sm text-gray-400 mt-4 hidden">
-      🌱 Start small — add your first step.
-    </p>
-
-  </div>
+<div id="results" class="results"></div>
 
 <script>
-let tasks = [];
-let method = "Checklist";
-let lastDate = null;
+const apiKey = "YOUR_OPENWEATHER_API_KEY"; // 🔑 replace this
 
-const methodDescriptions = {
-  "Checklist": "✅ Simple: complete each step anytime today.",
-  "Habit Stacking": "🔗 Link a new habit to an existing one (e.g., after coffee → stretch).",
-  "Time Blocking": "⏰ Assign rough times to each step (e.g., 9am deep work)."
-};
+const input = document.getElementById("locationInput");
+const suggestionsBox = document.getElementById("suggestions");
+const resultsDiv = document.getElementById("results");
 
-function load() {
-  const data = JSON.parse(localStorage.getItem("routine-app"));
-  if (data) {
-    tasks = data.tasks || [];
-    method = data.method || "Checklist";
-    lastDate = data.lastDate;
-  }
+let selectedLocation = null;
+
+// Fetch location suggestions
+input.addEventListener("input", async () => {
+  const query = input.value;
+  if (query.length < 2) return suggestionsBox.innerHTML = "";
+
+  const res = await fetch(
+    `https://api.openweathermap.org/geo/1.0/direct?q=${query}&limit=5&appid=${apiKey}`
+  );
+  const data = await res.json();
+
+  suggestionsBox.innerHTML = data.map(loc => `
+    <div onclick="selectLocation('${loc.name}', ${loc.lat}, ${loc.lon})">
+      ${loc.name}, ${loc.country}
+    </div>
+  `).join("");
+});
+
+// Select location
+function selectLocation(name, lat, lon) {
+  input.value = name;
+  suggestionsBox.innerHTML = "";
+  selectedLocation = { lat, lon };
+  fetchWeather();
 }
 
-function save() {
-  localStorage.setItem("routine-app", JSON.stringify({
-    tasks, method, lastDate
-  }));
+// Fetch weather forecast
+async function fetchWeather() {
+  const res = await fetch(
+    `https://api.openweathermap.org/data/2.5/forecast?lat=${selectedLocation.lat}&lon=${selectedLocation.lon}&units=metric&appid=${apiKey}`
+  );
+  const data = await res.json();
+
+  // get now, +3h, +6h
+  const forecasts = [data.list[0], data.list[1], data.list[2]];
+
+  resultsDiv.innerHTML = forecasts.map((f, i) => {
+    const temp = f.main.temp;
+    const layers = getLayers(temp);
+
+    const label = i === 0 ? "Now" : `+${i*3}h`;
+
+    return `
+      <div class="card">
+        <div class="time">${label}</div>
+        <div>${temp.toFixed(1)}°C</div>
+        <div>${layers}</div>
+      </div>
+    `;
+  }).join("");
 }
 
-function resetIfNewDay() {
-  const today = new Date().toDateString();
-  if (lastDate && lastDate !== today) {
-    tasks = tasks.map(t => ({ ...t, completed: false }));
-  }
-  lastDate = today;
+// Layer logic
+function getLayers(temp) {
+  if (temp >= 25) return "1 layer (t-shirt)";
+  if (temp >= 18) return "2 layers (t-shirt + light layer)";
+  if (temp >= 10) return "3 layers (sweater/jacket)";
+  if (temp >= 0) return "4 layers (coat)";
+  return "5 layers (winter gear)";
 }
-
-function switchTab(newMethod) {
-  method = newMethod;
-
-  document.querySelectorAll(".tab").forEach(btn => {
-    btn.classList.remove("bg-black", "text-white");
-    btn.classList.add("bg-gray-200");
-  });
-
-  const active = document.getElementById("tab-" + newMethod);
-  active.classList.add("bg-black", "text-white");
-  active.classList.remove("bg-gray-200");
-
-  render();
-}
-
-function addTask() {
-  const input = document.getElementById("taskInput");
-  if (!input.value.trim()) return;
-
-  tasks.push({ text: input.value, completed: false });
-  input.value = "";
-  render();
-}
-
-function toggleTask(i) {
-  tasks[i].completed = !tasks[i].completed;
-  render();
-}
-
-function deleteTask(i) {
-  tasks.splice(i, 1);
-  render();
-}
-
-function render() {
-  const list = document.getElementById("taskList");
-  list.innerHTML = "";
-
-  document.getElementById("methodInfo").innerText =
-    methodDescriptions[method];
-
-  tasks.forEach((task, i) => {
-    const div = document.createElement("div");
-    div.className = "flex justify-between items-center border p-2 rounded";
-
-    const span = document.createElement("span");
-
-    // Add emoji per method
-    let prefix = "✅";
-    if (method === "Habit Stacking") prefix = "🔗";
-    if (method === "Time Blocking") prefix = "⏰";
-
-    span.textContent = prefix + " " + task.text;
-    span.className = "flex-1 cursor-pointer " +
-      (task.completed ? "line-through text-gray-400" : "");
-
-    span.onclick = () => toggleTask(i);
-
-    const del = document.createElement("button");
-    del.textContent = "🗑️";
-    del.className = "ml-2";
-    del.onclick = () => deleteTask(i);
-
-    div.appendChild(span);
-    div.appendChild(del);
-    list.appendChild(div);
-  });
-
-  const completed = tasks.filter(t => t.completed).length;
-  const total = tasks.length;
-  const percent = total ? Math.round((completed / total) * 100) : 0;
-
-  document.getElementById("progressText").innerText =
-    `📊 ${completed}/${total} done`;
-
-  document.getElementById("progressBar").style.width = percent + "%";
-
-  document.getElementById("emptyState").style.display =
-    total === 0 ? "block" : "none";
-
-  save();
-}
-
-// Init
-load();
-resetIfNewDay();
-render();
 </script>
 
 </body>
