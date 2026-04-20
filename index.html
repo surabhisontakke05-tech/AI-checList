@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>How many layers should I wear today?</title>
+<title>How many layers</title>
 
 <style>
   body {
@@ -49,19 +49,24 @@
     margin: 40px auto;
   }
 
-  .big-number {
-    font-size: 64px;
+  .temp {
+    font-size: 48px;
     font-weight: bold;
+  }
+
+  .section-title {
+    font-size: 18px;
+    margin-top: 10px;
+  }
+
+  .layers {
+    font-size: 22px;
+    margin: 10px 0;
   }
 
   .emoji-row {
     font-size: 28px;
-    margin: 10px 0;
-  }
-
-  .desc {
-    font-size: 18px;
-    margin-bottom: 20px;
+    margin-bottom: 10px;
   }
 
   .weather {
@@ -100,7 +105,7 @@
 
 <h1>How many layers today?</h1>
 
-<input id="input" placeholder="Detecting your location..." autocomplete="off"/>
+<input id="input" placeholder="Start typing your location" autocomplete="off"/>
 <div id="suggestions" class="suggestions"></div>
 
 <div id="results"></div>
@@ -112,75 +117,70 @@ const resultsDiv = document.getElementById("results");
 
 let selectedLocation = null;
 let locationName = "";
+let currentCoords = null;
+
+// 🌍 Get user location once
+navigator.geolocation.getCurrentPosition(pos => {
+  currentCoords = {
+    lat: pos.coords.latitude,
+    lon: pos.coords.longitude
+  };
+});
 
 // 🔍 Autocomplete
 input.addEventListener("input", async () => {
   const value = input.value;
 
-  if (value.length < 2) {
+  if (value.length < 1) {
     suggestionsBox.innerHTML = "";
     return;
+  }
+
+  let html = "";
+
+  // Add current location option
+  if (currentCoords) {
+    html += `
+      <div onclick="useCurrentLocation()">
+        📍 Use current location
+      </div>
+    `;
   }
 
   const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${value}`);
   const data = await res.json();
 
-  if (!data.results) return;
+  if (data.results) {
+    html += data.results.slice(0,5).map(loc => `
+      <div onclick="selectLocation('${loc.name}', '${loc.admin1 || ""}', ${loc.latitude}, ${loc.longitude})">
+        ${loc.name}, ${loc.country}
+      </div>
+    `).join("");
+  }
 
-  suggestionsBox.innerHTML = data.results.slice(0,5).map(loc => `
-    <div onclick="selectLocation('${loc.name}', '${loc.admin1 || ""}', ${loc.latitude}, ${loc.longitude})">
-      ${loc.name}, ${loc.country}
-    </div>
-  `).join("");
+  suggestionsBox.innerHTML = html;
 });
 
-// 📍 Select location manually
-function selectLocation(name, region, lat, lon) {
-  input.value = name;
+// 📍 Use current location
+function useCurrentLocation() {
+  if (!currentCoords) return;
+
+  selectedLocation = currentCoords;
+  locationName = "Your location";
+  input.value = "Current location";
   suggestionsBox.innerHTML = "";
-  selectedLocation = { lat, lon };
-  locationName = region ? `${name}, ${region}` : name;
+
   fetchWeather();
 }
 
-// 🌍 Auto-detect user location
-async function detectLocation() {
-  resultsDiv.innerHTML = `<div class="loading">Detecting location...</div>`;
+// 📍 Select searched location
+function selectLocation(name, region, lat, lon) {
+  selectedLocation = { lat, lon };
+  locationName = region ? `${name}, ${region}` : name;
+  input.value = name;
+  suggestionsBox.innerHTML = "";
 
-  if (!navigator.geolocation) {
-    resultsDiv.innerHTML = `<div class="loading">Location not supported</div>`;
-    return;
-  }
-
-  navigator.geolocation.getCurrentPosition(async (pos) => {
-    const lat = pos.coords.latitude;
-    const lon = pos.coords.longitude;
-
-    selectedLocation = { lat, lon };
-
-    // Reverse geocode
-    const res = await fetch(
-      `https://geocoding-api.open-meteo.com/v1/reverse?latitude=${lat}&longitude=${lon}`
-    );
-
-    const data = await res.json();
-
-    if (data.results && data.results.length > 0) {
-      const place = data.results[0];
-      locationName = place.admin1
-        ? `${place.name}, ${place.admin1}`
-        : place.name;
-
-      input.value = place.name;
-    } else {
-      locationName = "Your location";
-      input.value = "Your location";
-    }
-
-    fetchWeather();
-  }, () => {
-    resultsDiv.innerHTML = `<div class="loading">Location access denied</div>`;
-  });
+  fetchWeather();
 }
 
 // 🌤 Weather
@@ -206,14 +206,17 @@ async function fetchWeather() {
 
   resultsDiv.innerHTML = `
     <div class="main">
-      
-      <div class="big-number">${mainLayer.count}</div>
+
+      <div class="temp">${now.toFixed(1)}°C</div>
+
+      <div class="section-title">Weather now</div>
+
+      <div class="layers">${mainLayer.count} layers needed</div>
       <div class="emoji-row">${mainLayer.emojis}</div>
-      <div class="desc">${mainLayer.label}</div>
+      <div>${mainLayer.label}</div>
 
       <div class="weather">
-        Weather in ${locationName}<br/>
-        ${now.toFixed(1)}°C<br/><br/>
+        ${locationName}<br/>
         High: ${high.toFixed(1)}°C<br/>
         Low: ${low.toFixed(1)}°C
       </div>
@@ -227,13 +230,13 @@ async function fetchWeather() {
   `;
 }
 
-// 🧥 Layer logic
+// 🧥 Layer logic (with more outfit variety)
 function getLayerData(temp) {
-  if (temp >= 25) return { count: 1, emojis: "👕", label: "T-shirt weather" };
-  if (temp >= 18) return { count: 2, emojis: "👕 🧥", label: "Light jacket weather" };
-  if (temp >= 10) return { count: 3, emojis: "👕 🧥 🧥", label: "Jacket weather" };
-  if (temp >= 0) return { count: 4, emojis: "👕 🧥 🧥 🧥", label: "Coat weather" };
-  return { count: 5, emojis: "👕 🧥 🧥 🧥 🧥", label: "Bundle up 🥶" };
+  if (temp >= 25) return { count: 1, emojis: "👕 🩳", label: "Light and breezy" };
+  if (temp >= 18) return { count: 2, emojis: "👕 🧥 👖", label: "Light jacket weather" };
+  if (temp >= 10) return { count: 3, emojis: "👕 🧥 👖 🧣", label: "Cool, layer up" };
+  if (temp >= 0) return { count: 4, emojis: "🧥 🧣 🧤 👖", label: "Cold, stay warm" };
+  return { count: 5, emojis: "🧥 🧣 🧤 🧦 🥾", label: "Bundle up 🥶" };
 }
 
 // small cards
@@ -244,13 +247,11 @@ function smallCard(time, temp) {
     <div class="small-card">
       <div class="time">${time}</div>
       <div>${temp.toFixed(1)}°C</div>
+      <div>${layer.count} layers</div>
       <div>${layer.emojis}</div>
     </div>
   `;
 }
-
-// 🚀 Init
-detectLocation();
 </script>
 
 </body>
