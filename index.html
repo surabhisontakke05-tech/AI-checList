@@ -78,7 +78,7 @@ input.addEventListener("input", async () => {
   if (query.length < 2) return suggestionsBox.innerHTML = "";
 
   const res = await fetch(
-    `https://api.openweathermap.org/geo/1.0/direct?q=${query}&limit=5&appid=${apiKey}`
+    `https://geocoding-api.open-meteo.com/v1/search?name=?q=${query}&limit=5&appid=${apiKey}`
   );
   const data = await res.json();
 
